@@ -462,7 +462,7 @@
 
 //int main()
 //{
-//    Mat imageSource=imread("55.jpeg",0);
+//    Mat imageSource=imread("11.png",0);
 //    Mat image;
 //    imageSource.copyTo(image);
 //    GaussianBlur(image,image,Size(3,3),0);  //滤波
@@ -525,13 +525,13 @@
 //    Mat elementTransf;
 //    elementTransf=  getAffineTransform(P1,P2);
 //    warpAffine(imageSource,imageSource,elementTransf,imageSource.size(),1,0,Scalar(255));
-////    仿射变换
-////    . src: 输入图像
-////    . dst: 输出图像，尺寸由dsize指定，图像类型与原图像一致
-////    . M: 2X3的变换矩阵
-////    . dsize: 指定图像输出尺寸
-////    . flags: 插值算法标识符，有默认值INTER_LINEAR，如果插值算法为WARP_INVERSE_MAP, warpAffine
-////           函数使用如下矩阵进行图像转换
+//    仿射变换
+//    . src: 输入图像
+//    . dst: 输出图像，尺寸由dsize指定，图像类型与原图像一致
+//    . M: 2X3的变换矩阵
+//    . dsize: 指定图像输出尺寸
+//    . flags: 插值算法标识符，有默认值INTER_LINEAR，如果插值算法为WARP_INVERSE_MAP, warpAffine
+//           函数使用如下矩阵进行图像转换
 //    imshow("校正",imageSource);
 //    //Zbar二维码识别
 //    ImageScanner scanner;
@@ -599,84 +599,85 @@ CvSeq* findSquares4( IplImage* img, CvMemStorage* storage )
  IplImage* gray = cvCreateImage( sz, 8, 1 );
  IplImage* pyr = cvCreateImage( cvSize(sz.width/2, sz.height/2), 8, 3 );
  IplImage* tgray;
- CvSeq* result;
+ CvSeq* result;//动态结构序列CvSeq是所有OpenCv动态数据结构的基础
  double s, t;
  // 创建一个空序列用于存储轮廓角点
  CvSeq* squares = cvCreateSeq( 0, sizeof(CvSeq), sizeof(CvPoint), storage );
-
- cvSetImageROI( timg, cvRect( 0, 0, sz.width, sz.height ));//截取/裁剪图片
+//创建一序列/seq_flags为序列的符号标志/序列头部的大小/Elem_size为元素的大小
+ cvSetImageROI( timg, cvRect( 0, 0, sz.width, sz.height ));//获取感兴趣的区域ROI
  // 过滤噪音
  cvPyrDown( timg, pyr, 7 );
+ //下采样原理:把原始图像s*s窗口内的图像变成一个像素，这个像素点的值就是窗口内所有像素的均值：
  cvPyrUp( pyr, timg, 7 );
+// 上采样原理：图像放大几乎都是采用内插值方法，即在原有图像像素的基础上在像素点之间采用合适的插值算法插入新的元素。
  tgray = cvCreateImage( sz, 8, 1 );
 
  // 红绿蓝3色分别尝试提取
  for( c = 0; c < 3; c++ )
  {
   // 提取 the c-th color plane
-  cvSetImageCOI( timg, c+1 );
+  cvSetImageCOI( timg, c+1 );//设置感兴趣通道
   cvCopy( timg, tgray, 0 );
 
   // 尝试各种阈值提取得到的（N=11）
   for( l = 0; l < N; l++ )
   {
-   // apply Canny. Take the upper threshold from slider
-   // Canny helps to catch squares with gradient shading
-   if( l == 0 )
-   {
-    cvCanny( tgray, gray, 0, thresh, 5 );
-    //使用任意结构元素膨胀图像
-    cvDilate( gray, gray, 0, 1 );
-   }
-   else
-   {
-    // apply threshold if l!=0:
-    cvThreshold( tgray, gray, (l+1)*255/N, 255, CV_THRESH_BINARY );
-   }
+       // apply Canny. Take the upper threshold from slider
+       // Canny helps to catch squares with gradient shading
+       if( l == 0 )
+       {
+        cvCanny( tgray, gray, 0, thresh, 5 );
+        //使用任意结构元素膨胀图像
+        cvDilate( gray, gray, 0, 1 );
+       }
+       else
+       {
+        // apply threshold if l!=0:
+        cvThreshold( tgray, gray, (l+1)*255/N, 255, CV_THRESH_BINARY );//二值化
+       }
 
-   // 找到所有轮廓并且存储在序列中
-   cvFindContours( gray, storage, &contours, sizeof(CvContour),
-    CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0) );
+       // 找到所有轮廓并且存储在序列中
+       cvFindContours( gray, storage, &contours, sizeof(CvContour),
+        CV_RETR_LIST, CV_CHAIN_APPROX_SIMPLE, cvPoint(0,0) );
 
-   // 遍历找到的每个轮廓contours
-   while( contours )
-   {
-     //用指定精度逼近多边形曲线
-    result = cvApproxPoly( contours, sizeof(CvContour), storage,
-     CV_POLY_APPROX_DP, cvContourPerimeter(contours)*0.02, 0 );
+       // 遍历找到的每个轮廓contours
+       while( contours )
+       {
+         //用指定精度逼近多边形曲线
+        result = cvApproxPoly( contours, sizeof(CvContour), storage,
+         CV_POLY_APPROX_DP, cvContourPerimeter(contours)*0.02, 0 );
 
+        if( result->total == 4 &&
+         fabs(cvContourArea(result,CV_WHOLE_SEQ)) > 500 &&
+         fabs(cvContourArea(result,CV_WHOLE_SEQ)) < 100000 &&
+         cvCheckContourConvexity(result) )//是否是凸形
+        {
+         s = 0;
 
-    if( result->total == 4 &&
-     fabs(cvContourArea(result,CV_WHOLE_SEQ)) > 500 &&
-     fabs(cvContourArea(result,CV_WHOLE_SEQ)) < 100000 &&
-     cvCheckContourConvexity(result) )
-    {
-     s = 0;
+         for( i = 0; i < 5; i++ )
+         {
+          // find minimum angle between joint edges (maximum of cosine)
+          if( i >= 2 )
+          {
+           t = fabs(angle(
+            (CvPoint*)cvGetSeqElem( result, i ),
+            (CvPoint*)cvGetSeqElem( result, i-2 ),
+            (CvPoint*)cvGetSeqElem( result, i-1 )));
+           s = s > t ? s : t;
+          }
+         }
 
-     for( i = 0; i < 5; i++ )
-     {
-      // find minimum angle between joint edges (maximum of cosine)
-      if( i >= 2 )
-      {
-       t = fabs(angle(
-        (CvPoint*)cvGetSeqElem( result, i ),
-        (CvPoint*)cvGetSeqElem( result, i-2 ),
-        (CvPoint*)cvGetSeqElem( result, i-1 )));
-       s = s > t ? s : t;
-      }
-     }
+         // if 余弦值 足够小，可以认定角度为90度直角
+         //cos0.1=83度，能较好的趋近直角
+         if( s < 0.1 )
+          for( i = 0; i < 4; i++ )
+           cvSeqPush( squares,
+           (CvPoint*)cvGetSeqElem( result, i ));
+        }
 
-     // if 余弦值 足够小，可以认定角度为90度直角
-     //cos0.1=83度，能较好的趋近直角
-     if( s < 0.1 )
-      for( i = 0; i < 4; i++ )
-       cvSeqPush( squares,
-       (CvPoint*)cvGetSeqElem( result, i ));
-    }
-
-    // 继续查找下一个轮廓
-    contours = contours->h_next;
-   }
+        // 继续查找下一个轮廓
+        contours = contours->h_next;
+       }
   }
  }
  cvReleaseImage( &gray );
@@ -690,57 +691,110 @@ CvSeq* findSquares4( IplImage* img, CvMemStorage* storage )
 //drawSquares函数用来画出在图像中找到的所有正方形轮廓
 void drawSquares( IplImage* img, CvSeq* squares )
 {
- CvSeqReader reader;
- IplImage* cpy = cvCloneImage( img );
- int i;
- cvStartReadSeq( squares, &reader, 0 );
+     CvSeqReader reader;
+     IplImage* cpy = cvCloneImage( img );
+     int i;
+     cvStartReadSeq( squares, &reader, 0 );
 
- // read 4 sequence elements at a time (all vertices of a square)
- for( i = 0; i < squares->total; i += 4 )
- {
-  CvPoint pt[4], *rect = pt;
-  int count = 4;
+     // read 4 sequence elements at a time (all vertices of a square)
+//     for( i = 0; i < squares->total; i += 4 )
+     for( i = 0; i<2; i += 4 )
+     {
+          CvPoint pt[4], *rect = pt;
+          int count = 4;
+          // read 4 vertices
+          CV_READ_SEQ_ELEM( pt[0], reader );
+          CV_READ_SEQ_ELEM( pt[1], reader );
+          CV_READ_SEQ_ELEM( pt[2], reader );
+          CV_READ_SEQ_ELEM( pt[3], reader );
 
-  // read 4 vertices
-  CV_READ_SEQ_ELEM( pt[0], reader );
-  CV_READ_SEQ_ELEM( pt[1], reader );
-  CV_READ_SEQ_ELEM( pt[2], reader );
-  CV_READ_SEQ_ELEM( pt[3], reader );
+          // draw the square as a closed polyline
+          cvPolyLine( cpy, &rect, &count, 1, 1, CV_RGB(0,255,0), 2, CV_AA, 0 );
+     }
 
-  // draw the square as a closed polyline
-  cvPolyLine( cpy, &rect, &count, 1, 1, CV_RGB(0,255,0), 2, CV_AA, 0 );
- }
-
- cvShowImage( wndname, cpy );
- cvReleaseImage( &cpy );
+     cvShowImage( wndname, cpy );
+     cvReleaseImage( &cpy );
 }
 
-int main(int argc, char** argv)
+//////////////////////////////图像矫正函数-test/////////////////////
+void hough(Mat imageSource,CvSeq* squares){
+    CvSeqReader reader;
+//    IplImage* cpy = cvCloneImage( img );
+    int i;
+    cvStartReadSeq( squares, &reader, 0 );
+
+    Point2f pt[4];
+    // read 4 sequence elements at a time (all vertices of a square)
+//    for( i = 0; i < squares->total; i += 4 )
+    for( i = 0; i < 2; i += 4 )
+    {
+         Point2f pt[4], *rect = pt;
+         int count = 4;
+         // read 4 vertices
+         CV_READ_SEQ_ELEM( pt[0], reader );
+         CV_READ_SEQ_ELEM( pt[1], reader );
+         CV_READ_SEQ_ELEM( pt[2], reader );
+         CV_READ_SEQ_ELEM( pt[3], reader );
+         // draw the square as a closed polyline
+    //     cvPolyLine( cpy, &rect, &count, 1, 1, CV_RGB(0,255,0), 2, CV_AA, 0 );
+//         CvPoint P1[4];
+    }
+
+    Point2f P2[4];
+    Point2f* P1 = pt;
+    vector<Point2f>corners;
+//         goodFeaturesToTrack(DrawLine,corners,4,0.1,10,Mat()); //角点检测
+//         for(int i=0;i<corners.size();i++)
+//         {
+//             circle(DrawLine,corners[i],3,Scalar(255),3);
+//             P1[i]=corners[i];
+//         }
+//         imshow("交点",DrawLine);
+    int width=P1[1].x-P1[0].x;
+    int hight=P1[2].y-P1[0].y;
+    P2[0]=P1[0];
+    P2[1]=Point2f(P2[0].x+width,P2[0].y);
+    P2[2]=Point2f(P2[0].x,P2[1].y+hight);
+    P2[3]=Point2f(P2[1].x,P2[2].y);
+    Mat elementTransf;
+    elementTransf=  getAffineTransform(P1,P2);
+    warpAffine(imageSource,imageSource,elementTransf,imageSource.size(),1,0,Scalar(255));
+    imshow("hough",imageSource);
+//    cvShowImage( wndname, cpy );
+//    cvReleaseImage( &cpy );
+
+
+//    Point2f P1[4];
+//    Point2f P2[4];
+
+}
+
+int main()
 {
-  int i, c;
-  storage = cvCreateMemStorage(0);
+      storage = cvCreateMemStorage(0);
 
-  img0 = cvLoadImage( "91.jpeg", 1 );
-  if( !img0 )
-  {
-   cout <<"不能载入"<<endl;
-  }
-  img = cvCloneImage( img0 );
-  cvNamedWindow( wndname, 1 );
+      img0 = cvLoadImage( "10.jpg", 1 );
+      if( !img0 )
+      {
+       cout <<"不能载入"<<endl;
+      }
+      img = cvCloneImage( img0 );
+      IplImage* img1 = cvCloneImage(img0);
+      cvNamedWindow( wndname, 1 );
 
-  // find and draw the squares
-  drawSquares( img, findSquares4( img, storage ) );
+      // find and draw the squares
+      drawSquares( img, findSquares4( img, storage ) );
 
-  c = cvWaitKey(0);
+//      hough(img1,findSquares4( img, storage ));
+      cvWaitKey(0);
 
-  cvReleaseImage( &img );
-  cvReleaseImage( &img0 );
+      cvReleaseImage( &img );
+      cvReleaseImage( &img0 );
 
-  cvClearMemStorage( storage );
+      cvClearMemStorage( storage );
 
-
- cvDestroyWindow( wndname );
- return 0;
+     cvDestroyWindow( wndname );
+     return 0;
 }
 
 
